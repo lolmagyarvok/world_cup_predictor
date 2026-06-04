@@ -1,17 +1,18 @@
-CREATE TABLE tournament (
+CREATE TABLE IF NOT EXISTS tournament (
     id          INTEGER PRIMARY KEY,
     year        INTEGER NOT NULL UNIQUE,
     host_country TEXT   NOT NULL,
     host_continent TEXT NOT NULL    -- UEFA / CONMEBOL / CAF / AFC / CONCACAF / OFC
 );
-CREATE TABLE team (
+
+CREATE TABLE IF NOT EXISTS team (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT    NOT NULL UNIQUE,   -- "Brazil", "France", ...
     fifa_code   TEXT    NOT NULL UNIQUE,   -- "BRA", "FRA", ...
     continent   TEXT    NOT NULL           -- UEFA / CONMEBOL / ...
 );
-CREATE TABLE sqlite_sequence(name,seq);
-CREATE TABLE player (
+
+CREATE TABLE IF NOT EXISTS player (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     name            TEXT    NOT NULL,
     nationality     TEXT    NOT NULL,      -- FIFA kód, pl. "BRA"
@@ -21,9 +22,11 @@ CREATE TABLE player (
     market_value_eur REAL   DEFAULT 0.0,   -- Transfermarkt, EUR
     club            TEXT                   -- aktuális klub neve
 );
-CREATE UNIQUE INDEX idx_player_name_nat
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_player_name_nat
     ON player(name, nationality);
-CREATE TABLE team_tournament_stat (
+
+CREATE TABLE IF NOT EXISTS team_tournament_stat (
     id                          INTEGER PRIMARY KEY AUTOINCREMENT,
     team_id                     INTEGER NOT NULL REFERENCES team(id),
     tournament_id               INTEGER NOT NULL REFERENCES tournament(id),
@@ -63,7 +66,8 @@ CREATE TABLE team_tournament_stat (
 
     UNIQUE(team_id, tournament_id)
 );
-CREATE TABLE player_tournament_stat (
+
+CREATE TABLE IF NOT EXISTS player_tournament_stat (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     player_id           INTEGER NOT NULL REFERENCES player(id),
     tournament_id       INTEGER NOT NULL REFERENCES tournament(id),
@@ -86,7 +90,8 @@ CREATE TABLE player_tournament_stat (
 
     UNIQUE(player_id, tournament_id)
 );
-CREATE TABLE match (
+
+CREATE TABLE IF NOT EXISTS match (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     tournament_id   INTEGER NOT NULL REFERENCES tournament(id),
     home_team_id    INTEGER NOT NULL REFERENCES team(id),
@@ -115,10 +120,12 @@ CREATE TABLE match (
 
     CHECK(home_team_id != away_team_id)
 );
-CREATE INDEX idx_match_tournament ON match(tournament_id);
-CREATE INDEX idx_match_home       ON match(home_team_id);
-CREATE INDEX idx_match_away       ON match(away_team_id);
-CREATE TABLE match_lineup (
+
+CREATE INDEX IF NOT EXISTS idx_match_tournament ON match(tournament_id);
+CREATE INDEX IF NOT EXISTS idx_match_home       ON match(home_team_id);
+CREATE INDEX IF NOT EXISTS idx_match_away       ON match(away_team_id);
+
+CREATE TABLE IF NOT EXISTS match_lineup (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     match_id    INTEGER NOT NULL REFERENCES match(id) ON DELETE CASCADE,
     player_id   INTEGER NOT NULL REFERENCES player(id),
@@ -130,8 +137,10 @@ CREATE TABLE match_lineup (
 
     UNIQUE(match_id, player_id)
 );
-CREATE INDEX idx_lineup_match ON match_lineup(match_id);
-CREATE TABLE goal_event (
+
+CREATE INDEX IF NOT EXISTS idx_lineup_match ON match_lineup(match_id);
+
+CREATE TABLE IF NOT EXISTS goal_event (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     match_id    INTEGER NOT NULL REFERENCES match(id) ON DELETE CASCADE,
     player_id   INTEGER         REFERENCES player(id),  -- NULL = ismeretlen
@@ -141,8 +150,10 @@ CREATE TABLE goal_event (
     is_penalty  INTEGER NOT NULL DEFAULT 0 CHECK(is_penalty IN (0,1)),
     is_own_goal INTEGER NOT NULL DEFAULT 0 CHECK(is_own_goal IN (0,1))
 );
-CREATE INDEX idx_goal_match ON goal_event(match_id);
-CREATE TABLE card_event (
+
+CREATE INDEX IF NOT EXISTS idx_goal_match ON goal_event(match_id);
+
+CREATE TABLE IF NOT EXISTS card_event (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     match_id    INTEGER NOT NULL REFERENCES match(id) ON DELETE CASCADE,
     player_id   INTEGER         REFERENCES player(id),
@@ -151,7 +162,8 @@ CREATE TABLE card_event (
     minute      INTEGER NOT NULL,
     card_type   TEXT    NOT NULL CHECK(card_type IN ('yellow','red','yellow_red'))
 );
-CREATE TABLE penalty_shootout (
+
+CREATE TABLE IF NOT EXISTS penalty_shootout (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     match_id    INTEGER NOT NULL REFERENCES match(id) ON DELETE CASCADE,
     player_id   INTEGER         REFERENCES player(id),
@@ -160,8 +172,10 @@ CREATE TABLE penalty_shootout (
     order_num   INTEGER NOT NULL,   -- rúgás sorrendje (1-től)
     scored      INTEGER NOT NULL CHECK(scored IN (0,1))
 );
-CREATE INDEX idx_pen_match ON penalty_shootout(match_id);
-CREATE TABLE elo_log (
+
+CREATE INDEX IF NOT EXISTS idx_pen_match ON penalty_shootout(match_id);
+
+CREATE TABLE IF NOT EXISTS elo_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     team_id     INTEGER NOT NULL REFERENCES team(id),
     match_id    INTEGER NOT NULL REFERENCES match(id),
@@ -170,7 +184,8 @@ CREATE TABLE elo_log (
     k_factor    REAL    NOT NULL DEFAULT 20.0,
     logged_at   TEXT    NOT NULL DEFAULT (datetime('now'))
 );
-CREATE VIEW v_head_to_head AS
+
+CREATE VIEW IF NOT EXISTS v_head_to_head AS
 SELECT
     m.home_team_id  AS team_a_id,
     m.away_team_id  AS team_b_id,
@@ -183,7 +198,8 @@ SELECT
 FROM match m
 GROUP BY m.home_team_id, m.away_team_id
 /* v_head_to_head(team_a_id,team_b_id,matches_played,team_a_wins,draws,team_b_wins,avg_goals_a,avg_goals_b) */;
-CREATE VIEW v_current_elo AS
+
+CREATE VIEW IF NOT EXISTS v_current_elo AS
 SELECT
     el.team_id,
     t.name,
@@ -198,7 +214,8 @@ WHERE el.id = (
     LIMIT 1
 )
 /* v_current_elo(team_id,name,current_elo,logged_at) */;
-CREATE VIEW v_squad_injuries AS
+
+CREATE VIEW IF NOT EXISTS v_squad_injuries AS
 SELECT
     pts.team_id,
     t.name AS team_name,
