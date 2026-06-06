@@ -8,5 +8,13 @@ v_squad_injuries
 v_current_elo
 v_head_to_head
 
-
+https://github.com/openfootball/football.json/tree/master
+https://github.com/openfootball/worldcup
+https://github.com/statsbomb/open-data
 https://dbdiagram.io/d/world_cup_db_schema-6a219690d2fbd72c4d530fcb
+
+1. Kaggle WC dataset       → teams tábla alapja (offline, egyszeri)
+2. openfootball JSON       → matches tábla 2014-2022 (offline, egyszeri)
+3. StatsBombpy             → részletes meccsstat, xG, player data
+4. football-data.org       → 2026 VB menettelend + live eredmények
+5. API-Football (backup)   → ha player injury/lineup kell napi szinten
