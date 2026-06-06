@@ -13,6 +13,14 @@ https://github.com/openfootball/worldcup
 https://github.com/statsbomb/open-data
 https://dbdiagram.io/d/world_cup_db_schema-6a219690d2fbd72c4d530fcb
 
+data-loaded: 
+-kaggle wc teams and stats
+-openfootball league matches and stats
+- all international tét matches from 2002
+
+
+
+
 1. Kaggle WC dataset       → teams tábla alapja (offline, egyszeri)
 2. openfootball JSON       → matches tábla 2014-2022 (offline, egyszeri)
 3. StatsBombpy             → részletes meccsstat, xG, player data
