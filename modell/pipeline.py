@@ -255,28 +255,22 @@ def build_prediction_row(
     form_cache: dict | None = None,
 ) -> pd.DataFrame:
     """
-    Egyetlen meccs feature vektorát rakja össze predikcihoz.
-    elo_tl és form_cache átadható ha batch predikcióhoz előre számolod.
+    Egyetlen meccs feature vektorát rakja össze predikcióhoz.
     """
     if elo_tl is None:
         elo_tl = _build_elo_timeline(conn)
     if form_cache is None:
         form_cache = _build_form_cache(conn)
 
-    # Legutóbbi ELO értékek
-    home_elo_rows = conn.execute("""
-        SELECT elo_after FROM elo_log WHERE team_id=?
-        ORDER BY id DESC LIMIT 1
-    """, (home_team_id,)).fetchone()
-    away_elo_rows = conn.execute("""
-        SELECT elo_after FROM elo_log WHERE team_id=?
-        ORDER BY id DESC LIMIT 1
-    """, (away_team_id,)).fetchone()
+    # 1. JAVÍTÁS: A VAK MODELL FIX 
+    # A régi elo_log helyett az importált, tökéletes static_elo-t használjuk!
+    h_stat = conn.execute("SELECT elo_rating FROM static_elo WHERE team_id=?", (home_team_id,)).fetchone()
+    a_stat = conn.execute("SELECT elo_rating FROM static_elo WHERE team_id=?", (away_team_id,)).fetchone()
 
-    elo_home = home_elo_rows["elo_after"] if home_elo_rows else 1500.0
-    elo_away = away_elo_rows["elo_after"] if away_elo_rows else 1500.0
+    elo_home = h_stat["elo_rating"] if h_stat else 1450.0
+    elo_away = a_stat["elo_rating"] if a_stat else 1450.0
 
-    # Legutóbbi forma – utolsó match_id alapján
+    # Legutóbbi forma – utolsó match_id alapján (ez maradhat az elo_log-ból)
     last_home_match = conn.execute("""
         SELECT match_id FROM elo_log WHERE team_id=? ORDER BY id DESC LIMIT 1
     """, (home_team_id,)).fetchone()
@@ -304,8 +298,14 @@ def build_prediction_row(
     home_tts = conn.execute(tts_q, (home_team_id,)).fetchone()
     away_tts = conn.execute(tts_q, (away_team_id,)).fetchone()
 
+    # 2. JAVÍTÁS: A GOD MODE FIX
     def _tts(row, col, default=0):
-        return row[col] if (row and row[col] is not None) else default
+        if row and row[col] is not None:
+            return row[col]
+        # Ha a csapatnak nincs FIFA rangja az adatbázisban, kapjon egy reális, gyenge (150.) helyezést, ne 0-t!
+        if col == "fifa_rank_pre":
+            return 150
+        return default
 
     rec = {
         "elo_diff":           elo_home - elo_away,

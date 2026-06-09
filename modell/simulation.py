@@ -101,7 +101,20 @@ class ProbCache:
                 self._conn, h_id, a_id, "Group stage",
                 self._elo_tl, self._form_cache
             )
-            return predict_proba(self._model, self._feature_names, X)[0]
+            raw_probs = predict_proba(self._model, self._feature_names, X)[0]
+            
+            # 2. Megnézzük a modell belső sorrendjét
+            classes = list(self._model.classes_)
+            
+            # FIGYELEM: Itt a zárójelekbe azt az értéket kell írnod, 
+            # amivel betanítottad a modellt (a target oszlopod értékeit)!
+            # Ha pl. a betanításnál 0=Vendég, 1=Döntetlen, 2=Hazai volt:
+            idx_away = classes.index(0)  # Lehet, hogy nálad ez 'A' vagy -1
+            idx_draw = classes.index(1)  # Lehet, hogy nálad ez 'D' vagy 0
+            idx_home = classes.index(2)  # Lehet, hogy nálad ez 'H' vagy 1
+            
+            # 3. Összerakjuk a kötelező [Vendég, Döntetlen, Hazai] sorrendet
+            return np.array([raw_probs[idx_away], raw_probs[idx_draw], raw_probs[idx_home]])
         except Exception:
             elo_diff = self._elo_cache.get(h_id, 1500) - self._elo_cache.get(a_id, 1500)
             p_h = 1 / (1 + 10 ** (-elo_diff / 400))
@@ -244,12 +257,8 @@ def simulate_group(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def best_third_place(
-    third_standings: list[tuple[str, Standing]]   # [(group_name, standing), ...]
+    third_standings: list[tuple[str, Standing]]
 ) -> tuple[list[tuple[str, Standing]], list[tuple[str, Standing]]]:
-    """
-    Visszaadja (továbbjutó_8, kiesett_4) sorban.
-    Rendezés: pontok → gólkülönbség → lőtt gólok → véletlen (tiebreak).
-    """
     ranked = sorted(
         third_standings,
         key=lambda x: (x[1].pts, x[1].gd, x[1].gf),
@@ -287,16 +296,30 @@ def resolve_r32_bracket(
 
     def resolve_third_slot(slot: str) -> Team:
         """slot pl. '3A/B/C/D/F' → a legjobb harmadik abból a halmazból"""
-        groups_in_slot = slot[1:].split("/")   # ["A","B","C","D","F"]
-        # Keres a remaining_thirds-ben
-        for i, (gname, st) in enumerate(remaining_thirds):
-            if gname in groups_in_slot:
-                remaining_thirds.pop(i)
-                return st.team
-        # Fallback: első maradt
-        if remaining_thirds:
-            return remaining_thirds.pop(0)[1].team
-        raise ValueError(f"Nem találtam harmadik helyezettet: {slot}")
+        groups_in_slot = slot[1:].split("/")
+
+        # Csak az adott csoportokból keressen, és a legjobb maradjon meg
+        candidates = [
+            (i, gname, st) for i, (gname, st) in enumerate(remaining_thirds)
+            if gname in groups_in_slot
+        ]
+
+        if not candidates:
+            # Fallback: a legjobb maradt harmadik (ELO alapján rendezve!)
+            if remaining_thirds:
+                best_idx = max(
+                    range(len(remaining_thirds)),
+                    key=lambda i: remaining_thirds[i][1].pts * 1000 
+                                + remaining_thirds[i][1].gd * 10 
+                                + remaining_thirds[i][1].gf
+                )
+                return remaining_thirds.pop(best_idx)[1].team
+            raise ValueError(f"Nem találtam harmadik helyezettet: {slot}")
+
+        # A legjobb jelöltet válasszuk (pts → gd → gf szerint)
+        best = max(candidates, key=lambda x: (x[2].pts, x[2].gd, x[2].gf))
+        remaining_thirds.pop(best[0])
+        return best[2].team
 
     pairs: list[tuple[Team, Team]] = []
     for m in sorted(r32_template, key=lambda x: x["match_date"]):
@@ -497,13 +520,17 @@ def run(seed: int = 42) -> None:
     """).fetchall()
     all_teams = [Team(r["id"], r["name"]) for r in rows]
 
+    #nem saját elo szerinti számolás itt lehet elo_log ra visszaá
     elo_cache: dict[int, float] = {}
     for t in all_teams:
+        # A valós, előre kiszámolt 2026-os ELO értékek használata
         row = conn.execute(
-            "SELECT elo_after FROM elo_log WHERE team_id=? ORDER BY id DESC LIMIT 1",
+            "SELECT elo_rating FROM static_elo WHERE team_id=?", 
             (t.id,)
         ).fetchone()
-        elo_cache[t.id] = row["elo_after"] if row else 1500.0
+        
+        # Ha nincs meg egy gyengébb csapat ELO-ja, kap egy reális 1450-es defaultot
+        elo_cache[t.id] = row["elo_rating"] if row else 1450.0
 
     cache = ProbCache(conn, model, feature_names, elo_cache, all_teams)
 

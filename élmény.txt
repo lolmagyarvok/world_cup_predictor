@@ -1,0 +1,6 @@
+A pipeline.py-ban a build_prediction_row lekéri a csapatok 2026-os statisztikáit (team_tournament_stat). Van egy segédfüggvényed, a _tts(), ami ha nem talál adatot egy csapatról (mert mondjuk Új-Zélandnak még nincs feltöltve a 2026-os értéke az adatbázisban), akkor 0-t ad vissza alapértelmezettként.
+
+A futballban a góloknál a 0 rossz.
+
+De a FIFA ranglistán a 0 azt jelenti, hogy te vagy a világ legjobb csapata! (Még az 1. helynél is jobb).
+Amikor a modell meglátta, hogy Új-Zéland FIFA rangja 0, Franciaországé meg mondjuk 2, azt hitte, Új-Zéland a galaxis legerősebb csapata.
