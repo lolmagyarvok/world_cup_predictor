@@ -18,6 +18,7 @@ import random
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+import json
 
 import numpy as np
 
@@ -581,6 +582,7 @@ def run(seed: int = 42) -> None:
 
     # ══════════════════════════════════════════════════════════════════
     print_header()
+    all_simulated_matches = []
 
     # ── 1. CSOPORTKÖR ─────────────────────────────────────────────────
     print(f"\n  {'─'*60}")
@@ -602,6 +604,7 @@ def run(seed: int = 42) -> None:
         third_place_list.append((gl, ranked[2]))
 
         print_group_standings(f"Group {gl}", ranked, results)
+        all_simulated_matches.extend(results)
 
     # ── 2. HARMADIK HELYEZETTEK ───────────────────────────────────────
     best_thirds, eliminated_thirds = best_third_place(third_place_list)
@@ -623,6 +626,7 @@ def run(seed: int = 42) -> None:
         r32_pairs, "Round of 32", cache, elo_cache, rng
     )
     print_knockout_round("Round of 32", r32_pairs, r32_results)
+    all_simulated_matches.extend(r32_results)
 
     # ── 4. ROUND OF 16 ────────────────────────────────────────────────
     r16_pairs = [(r32_winners[i], r32_winners[i+1]) for i in range(0, len(r32_winners), 2)]
@@ -630,6 +634,7 @@ def run(seed: int = 42) -> None:
         r16_pairs, "Round of 16", cache, elo_cache, rng
     )
     print_knockout_round("Round of 16", r16_pairs, r16_results)
+    all_simulated_matches.extend(r16_results)
 
     # ── 5. NEGYEDDÖNTŐ ────────────────────────────────────────────────
     qf_pairs = [(r16_winners[i], r16_winners[i+1]) for i in range(0, len(r16_winners), 2)]
@@ -637,6 +642,7 @@ def run(seed: int = 42) -> None:
         qf_pairs, "Quarter-final", cache, elo_cache, rng
     )
     print_knockout_round("Quarter-final", qf_pairs, qf_results)
+    all_simulated_matches.extend(qf_results)
 
     # ── 6. ELŐDÖNTŐ ───────────────────────────────────────────────────
     sf_pairs = [(qf_winners[i], qf_winners[i+1]) for i in range(0, len(qf_winners), 2)]
@@ -644,7 +650,8 @@ def run(seed: int = 42) -> None:
         sf_pairs, "Semi-final", cache, elo_cache, rng
     )
     print_knockout_round("Semi-final", sf_pairs, sf_results)
-
+    all_simulated_matches.extend(sf_results)
+    
     # ── 7. DÖNTŐ ──────────────────────────────────────────────────────
     if len(sf_winners) >= 2:
         final_pairs = [(sf_winners[0], sf_winners[1])]
@@ -652,7 +659,41 @@ def run(seed: int = 42) -> None:
             final_pairs, "Final", cache, elo_cache, rng
         )
         print_knockout_round("Final", final_pairs, final_results)
+        all_simulated_matches.extend(final_results)
         print_champion(final_winners[0])
+
+    # ── 8. EXPORT TO JSON ─────────────────────────────────────────────
+    json_output = []
+    for res in all_simulated_matches:
+        # Determine the winner string for the evaluator
+        if res.home_goals > res.away_goals:
+            winner_str = res.home.name
+        elif res.away_goals > res.home_goals:
+            winner_str = res.away.name
+        else:
+            # If it went to penalties, res.winner is populated. Otherwise, it's a Draw.
+            if res.winner:
+                winner_str = res.winner.name
+            else:
+                winner_str = "Draw"
+                
+        match_dict = {
+            "home_team": res.home.name,
+            "away_team": res.away.name,
+            "home_goals": res.home_goals,
+            "away_goals": res.away_goals,
+            "predicted_winner": winner_str,
+            "went_to_et": res.went_to_et,
+            "went_to_pens": res.went_to_pens,
+            "stake": 10.0  # Default stake for the evaluator
+        }
+        json_output.append(match_dict)
+
+    # Save to a file in the same directory
+    with open("simulation_predictions.json", "w", encoding="utf-8") as f:
+        json.dump(json_output, f, indent=4, ensure_ascii=False)
+        
+    print(f"\n  ✅ Saved {len(json_output)} match predictions to 'simulation_predictions.json'")
 
     conn.close()
 
