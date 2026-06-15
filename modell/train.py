@@ -29,7 +29,7 @@ import joblib
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from data.db import get_connection
-from pipeline import build_training_matrix
+from modell.pipeline import build_training_matrix
 
 MODEL_DIR = Path(__file__).parent
 MODEL_PATH = MODEL_DIR / "xgb_model.joblib"
