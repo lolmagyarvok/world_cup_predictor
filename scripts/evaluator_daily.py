@@ -70,16 +70,18 @@ def evaluate_day(cursor, eval_date: str) -> dict:
         home_name = row["home_name"]
         away_name = row["away_name"]
         
-        # Ha bevezeted a -1 ID-t a döntetlenre, ezt az if-et később egyszerűsítheted.
-        # Addig is védekezünk a hiányzó nevek ellen.
-        pred_str = row["pred_name"] if pred_id not in (None, -1) else "Döntetlen"
-        actual_str = row["actual_name"] if actual_id not in (None, -1) else "Döntetlen"
+        # NULL = döntetlen (egységesítve: daily_predictor, update_results)
+        pred_str = row["pred_name"] if pred_id is not None else "Döntetlen"
+        actual_str = row["actual_name"] if actual_id is not None else "Döntetlen"
 
         staked += stake
         
-        # 3. Biztonságos kiértékelés (Nincs 'None == None' bomba)
-        # Csak akkor nyert a tipp, ha az actual_id NEM NULL (azaz tényleg lement a meccs)
-        is_correct = (actual_id is not None) and (pred_id == actual_id)
+        # 3. Döntetlen kiértékelés: pred=None ∧ actual=None = találat (mindkettő döntetlen)
+        #    Tipp nyert:  (a) döntetlent jósoltunk és döntetlen lett, VAGY
+        #                  (b) ugyanazt a csapatot jósoltuk és nyert
+        #    Fontos: actual_id=None akkor is, ha a meccs még nem történt meg — de
+        #    az SQL WHERE status='READY_FOR_EVAL' garantálja, hogy actual_id már ki van töltve.
+        is_correct = (pred_id is None and actual_id is None) or (pred_id is not None and pred_id == actual_id)
 
         if is_correct:
             correct += 1

@@ -4,3 +4,7 @@ A futballban a góloknál a 0 rossz.
 
 De a FIFA ranglistán a 0 azt jelenti, hogy te vagy a világ legjobb csapata! (Még az 1. helynél is jobb).
 Amikor a modell meglátta, hogy Új-Zéland FIFA rangja 0, Franciaországé meg mondjuk 2, azt hitte, Új-Zéland a galaxis legerősebb csapata.
+
+
+fcc-server
+fcc-claude

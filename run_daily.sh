@@ -39,6 +39,10 @@ fi
 # FŐ LOGIKA
 # ==============================================================================
 
+# Windows cp1250 konzol → UTF-8 kényszerítés (különben a Unicode boxrajzoló
+# karakterek és emojik UnicodeEncodeError-t dobhatnak)
+export PYTHONIOENCODING=utf-8
+
 echo ""
 echo "======================================================"
 echo "  🏆 VB NAPI PIPELINE  –  $(date '+%Y-%m-%d %H:%M:%S')"

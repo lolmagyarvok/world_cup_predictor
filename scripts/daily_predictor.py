@@ -39,7 +39,6 @@ ODDS_REGIONS = "eu"
 ODDS_MARKETS = "h2h"
 ODDS_FORMAT  = "decimal"
 STAKE        = Decimal('10.00')  # DECIMAL! Ezt megjegyezni!
-DRAW_ID      = -1                # A Döntetlen fix ID-ja a DB-ben (Nem NULL!)
 
 ODDS_NAME_MAP = {
     "United States": "USA",
@@ -210,7 +209,7 @@ def run(pred_date: str | None = None) -> None:
                 pred_label = f"{Y}{away_name}{RESET}"
                 prob_val = Decimal(str(away_p))
             else:
-                pred_winner_id = DRAW_ID  # <- LÁTOD? Nem None!
+                pred_winner_id = None  # NULL az adatbázisban = döntetlen
                 target_odds_key = "draw"
                 pred_label = f"{DIM}Döntetlen{RESET}"
                 prob_val = Decimal(str(draw_p))

@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 import json
 
+load_dotenv()
 
 API_KEY = os.environ.get("API_KEY_ODDS_API", "")
 SPORT = "soccer_fifa_world_cup"
@@ -82,15 +83,24 @@ def evaluate_performance(predictions: List[Dict[str, Any]], odds_data: List[Dict
         # Standardize team names based on mapping rules
         home = TEAM_NAME_MAP.get(pred["home_team"], pred["home_team"])
         away = TEAM_NAME_MAP.get(pred["away_team"], pred["away_team"])
-        
+
+        # actual_result kiszámítása a szimulált gólokból
+        hg, ag = pred["home_goals"], pred["away_goals"]
+        if hg > ag:
+            actual_result = pred["home_team"]
+        elif ag > hg:
+            actual_result = pred["away_team"]
+        else:
+            actual_result = None  # Döntetlen
+
         # Look for the match in the API response payload
         match_odds = next((m for m in odds_data if m["home_team"] == home and m["away_team"] == away), None)
-        
+
         # Default placeholder odds if match is missing or expired in the API cache
-        odds = {"home": 2.0, "away": 2.0, "draw": 3.1} 
+        odds = {"home": 2.0, "away": 2.0, "draw": 3.1}
         if match_odds:
             odds = get_market_odds(match_odds)
-            
+
         # Determine target odds based on what your model predicted
         if pred["predicted_winner"] == pred["home_team"]:
             target_odds = odds["home"]
@@ -98,19 +108,20 @@ def evaluate_performance(predictions: List[Dict[str, Any]], odds_data: List[Dict
             target_odds = odds["away"]
         else:
             target_odds = odds["draw"]
-            
+
         # Check prediction success
-        is_correct = pred["predicted_winner"] == pred["actual_result"]
+        is_correct = (pred["predicted_winner"] == actual_result) if actual_result is not None else False
         stake = pred["stake"]
         total_staked += stake
-        
+
         if is_correct:
             correct_predictions += 1
             returns = stake * target_odds
             total_returned += returns
             print(f"✅ {home} vs {away} | Predicted: {pred['predicted_winner']} | Odds: {target_odds} | Won: +${returns:.2f}")
         else:
-            print(f"❌ {home} vs {away} | Predicted: {pred['predicted_winner']} | Actual: {pred['actual_result']} | Lost: -${stake:.2f}")
+            actual_str = actual_result if actual_result is not None else "Döntetlen"
+            print(f"❌ {home} vs {away} | Predicted: {pred['predicted_winner']} | Actual: {actual_str} | Lost: -${stake:.2f}")
 
     # Financial & Accuracy Calculations
     accuracy = (correct_predictions / total_matches) * 100 if total_matches > 0 else 0

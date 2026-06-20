@@ -1,0 +1,63 @@
+🚨 1 KRITIKUS hiba (azonnali javítást igényel)
+
+  ┌─────┬─────────────────────────────┬───────────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────┐
+  │  #  │            Hiba             │                                     Hatás                                     │                  Hol                   │
+  ├─────┼─────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┼────────────────────────────────────────┤
+  │ 2   │ elo_log nem frissül a torna │ A forma-feature-ök (win_rate, momentum) soha nem változnak a VB alatt → a     │ update_results.py _update_elo()        │
+  │     │ alatt                       │ modell az egész torna alatt ugyanazokkal az értékekkel dolgozik                │                                        │
+  │     │                             │                                                                               │                                        │
+  │     │ Következmény:               │ daily_predictor ELO fallback ága (ha a modell hibázik) mindig a statikus      │ daily_predictor.py _predict_match()    │
+  │     │                             │ importált ELO-t használja, ami nem naprakész → tovább rontja a pontosságot     │                                        │
+  └─────┴─────────────────────────────┴───────────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────┘
+
+  🔧 Fontosabb fejlesztések
+
+  ┌─────┬──────────────────────────────┬─────────────────────────────────────────────────────────────────────────┐
+  │  #  │            Tétel             │                                 Leírás                                  │
+  ├─────┼──────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+  │ 4   │ simulation.py import javítás │ 28. sor: from pipeline → from modell.pipeline                            │
+  ├─────┼──────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+  │ 5   │ ELO naprakész frissítése     │ static_elo + elo_log szinkronizálása, init_elo_from_imported.py szkript │
+  ├─────┼──────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+  │ 6   │ load_all.py                  │ Egyetlen szkript a komplett adatbázis seedeléséhez (8 lépés)             │
+  ├─────┼──────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+  │ 7   │ requirements.txt kódolás     │ Sérült fájl javítása                                                    │
+  └─────┴──────────────────────────────┴─────────────────────────────────────────────────────────────────────────┘
+
+  ✅ Elvégzett javítások (már nincs teendő)
+
+  ┌─────┬───────────────────────────────────────┬───────────────────────────────────────────────────────────────────┬────────────────────────────────┐
+  │  #  │               Mit                      │                            Mit csináltunk                         │              Hol                │
+  ├─────┼───────────────────────────────────────┼───────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+  │ 1+3 │ Döntetlen tippek/NULL egységesítés     │ pred_winner_id=None mindenhol (nem -1, nem 0, nem DRAW_ID),      │ daily_predictor.py,             │
+  │     │                                       │ is_correct logika: pred=None ∧ actual=None → találat               │ evaluator_daily.py              │
+  ├─────┼───────────────────────────────────────┼───────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+  │ 9   │ API-Football → football-data.org       │ API-Football v3 free plan csak 2022-2024 → football-data.org v4   │ update_results.py               │
+  │     │ fallback                               │ beépítve fallbackként, FD_NAME_MAP a csapatnevekhez               │ FOOTBALL_DATA_KEY a .env-ben    │
+  ├─────┼───────────────────────────────────────┼───────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+  │ 10  │ Unicode hiba Windows-on               │ cp1250 konzol nem tud Unicode boxrajzoló/emoji →                   │ run_daily.sh                    │
+  │     │                                       │ PYTHONIOENCODING=utf-8 export a szkript elején                     │                                │
+  ├─────┼───────────────────────────────────────┼───────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+  │ 11  │ _update_elo cursor/connection bug      │ A függvény conn-t vár, de cursor-t kapott →                       │ update_results.py ~269. sor     │
+  │     │                                       │ "Cursor object has no attribute 'cursor'" hiba                     │ conn.commit() belül problémás   │
+  ├─────┼───────────────────────────────────────┼───────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+  │ 12  │ accuracy checker javítások             │ Hiányzó load_dotenv() → API key nem töltődött be. Hiányzó         │ accuracy checker/evaluator.py   │
+  │     │                                       │ actual_result (szimulációból kiszámolva) → döntetlen kezelés      │                                │
+  └─────┴───────────────────────────────────────┴───────────────────────────────────────────────────────────────────┴────────────────────────────────┘
+
+  💡 Javasolt további fejlesztések
+
+  ┌─────┬───────────────────────────┬────────────────────────────────────────────────┐
+  │  #  │        Tétel              │                   Miért                        │
+  ├─────┼───────────────────────────┼────────────────────────────────────────────────┤
+  │ 8   │ Strukturált naplózás      │ print() helyett Python logging, fájlba is      │
+  ├─────┼───────────────────────────┼────────────────────────────────────────────────┤
+  │ 9   │ Pipeline cleanup          │ "JAVÍTÁS" kommentek eltávolítása               │
+  ├─────┼───────────────────────────┼────────────────────────────────────────────────┤
+  │ 10  │ Klubformák bekötése       │ Kihasználatlan adat (club_form_loader)         │
+  ├─────┼───────────────────────────┼────────────────────────────────────────────────┤
+  │ 11  │ Poisson-gólmodell         │ Pontosabb döntetlen becslés, hosszú táv        │
+  ├─────┼───────────────────────────┼────────────────────────────────────────────────┤
+  │ 12  │ Csapatnév duplikáció      │ "USA"/"United States", "Bosnia" változatok    │
+  │     │ DB cleanup                │ merge-elése az adatbázisban                     │
+  └─────┴───────────────────────────┴────────────────────────────────────────────────┘

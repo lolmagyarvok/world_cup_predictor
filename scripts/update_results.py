@@ -35,6 +35,10 @@ BASE_URL = "https://v3.football.api-sports.io"
 LEAGUE_ID = 1   # FIFA World Cup az api-football.com-on (ellenőrizd a sajátod!)
 SEASON    = 2026
 
+# football-data.org fallback (free tier, 10 req/perc)
+FOOTBALL_DATA_KEY = os.environ.get("API_KEY_FOOTBALL-DATA-ORG", "")
+FOOTBALL_DATA_URL = "https://api.football-data.org/v4/competitions/WC/matches"
+
 ELO_K_FACTOR = 40  # VB meccsekhez ajánlott magasabb K-faktor
 
 HEADERS = {
@@ -48,6 +52,20 @@ API_NAME_MAP = {
     "South Korea":   "South Korea",
     "IR Iran":       "Iran",
     "Korea Republic": "South Korea",
+}
+
+# football-data.org → DB csapatnév megfeleltetés
+FD_NAME_MAP = {
+    "USA":                     "United States",
+    "Korea Republic":          "South Korea",
+    "Côte d'Ivoire":           "Ivory Coast",
+    "IR Iran":                 "Iran",
+    "Iran":                    "Iran",
+    "Bosnia-Herzegovina":      "Bosnia and Herzegovina",
+    "Curaçao":                 "Curacao",
+    "New Caledonia":           "New Caledonia",
+    "DR Congo":                "DR Congo",
+    "South Korea":             "South Korea",
 }
 
 # ── ELO frissítés ─────────────────────────────────────────────────────────────
@@ -124,7 +142,65 @@ def fetch_fixtures_by_date(target_date: str) -> list[dict]:
         return []
 
 
-# ── DB frissítés ──────────────────────────────────────────────────────────────
+def fetch_football_data_matches(target_date: str) -> list[dict]:
+    """
+    Fallback: football-data.org v4 (free tier).
+    API-Football ingyenes csomagja nem éri el a 2026-os szezont,
+    ezért ha az nem ad adatot, ezt próbáljuk.
+    Visszaadja a meccseket API-Football formátumba alakítva.
+    """
+    if not FOOTBALL_DATA_KEY:
+        print("  ℹ️  FOOTBALL_DATA_KEY nincs beállítva – football-data.org kihagyva.")
+        return []
+
+    url = f"{FOOTBALL_DATA_URL}?dateFrom={target_date}&dateTo={target_date}"
+    headers = {"X-Auth-Token": FOOTBALL_DATA_KEY}
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+
+        fixtures = []
+        for match in data.get("matches", []):
+            if match.get("status") not in ("FINISHED", "AWARDED"):
+                continue
+
+            ft = match.get("score", {}).get("fullTime", {})
+            home_goals = ft.get("home")
+            away_goals = ft.get("away")
+            if home_goals is None or away_goals is None:
+                continue  # Nincs teljes eredmény
+
+            # Team name mapping (FD → API-Football közös formátum)
+            raw_home = match["homeTeam"]["name"]
+            raw_away = match["awayTeam"]["name"]
+            home_name = FD_NAME_MAP.get(raw_home, raw_home)
+            away_name = FD_NAME_MAP.get(raw_away, raw_away)
+
+            fixtures.append({
+                "fixture": {"status": {"short": "FT"}},
+                "teams": {
+                    "home": {"name": home_name},
+                    "away": {"name": away_name},
+                },
+                "goals": {"home": home_goals, "away": away_goals},
+            })
+
+        if not fixtures and data.get("matches"):
+            print(f"  ⚠️  football-data.org: {len(data['matches'])} meccs, de egyik sem FINISHED.")
+        else:
+            print(f"  ✅ football-data.org: {len(fixtures)} befejezett meccs.")
+
+        return fixtures
+
+    except requests.exceptions.RequestException as e:
+        print(f"  ⚠️  football-data.org hiba: {e}")
+        return []
+    except (KeyError, TypeError, ValueError) as e:
+        print(f"  ⚠️  football-data.org adatfeldolgozási hiba: {e}")
+        return []
+
 
 def _normalize_name(name: str) -> str:
     """Normalizálja az API-tól kapott csapatnevet a DB névhez."""
@@ -189,8 +265,8 @@ def update_match_results(conn, fixtures: list[dict]) -> int:
                 print(f"  ✅ Eredmény előkészítve mentésre: {home_api} {h_goals}-{a_goals} {away_api}")
                 updated += 1
 
-                # ELO dinamikus frissítés - figyeld meg, hogy a 'cursor'-t passzoljuk át, nem a 'conn'-t!
-                _update_elo(cursor, home_id, away_id, h_goals, a_goals)
+                # ELO dinamikus frissítés - a Connection-t passzoljuk, mert _update_elo belül hív cursor()-t
+                _update_elo(conn, home_id, away_id, h_goals, a_goals)
             else:
                 print(f"  ℹ️  Kihagyva (már van eredmény vagy nincs a DB-ben): {home_api} vs {away_api}")
 
@@ -315,7 +391,13 @@ def main(target_date: str | None = None) -> None:
 
     print(f"\n  1. API lekérdezés: {target_date} meccseredményei...")
     fixtures = fetch_fixtures_by_date(target_date)
-    print(f"     {len(fixtures)} befejezett meccs érkezett az API-tól.")
+    print(f"     {len(fixtures)} befejezett meccs (API-Football).")
+
+    # Ha API-Football nem adott adatot (free plan limit), próbáljuk a football-data.org-ot
+    if not fixtures:
+        print("\n  ⏩ Fallback: football-data.org...")
+        fixtures = fetch_football_data_matches(target_date)
+        print(f"     {len(fixtures)} befejezett meccs (football-data.org).")
 
     if fixtures:
         print("\n  2. Eredmények mentése az adatbázisba...")
@@ -326,8 +408,8 @@ def main(target_date: str | None = None) -> None:
         marked = mark_predictions_with_results(conn, target_date)
         print(f"     {marked} predikció kész a kiértékelésre.")
     else:
-        print("  ⚠️  Nem érkezett meccsadat – lehet, hogy ma nincsenek meccsek,")
-        print("       vagy az API_KEY_FOOTBALL nincs beállítva.")
+        print("  ⚠️  Nem érkezett meccsadat – egyik API sem adott eredményt.")
+        print("       Ellenőrizd az API kulcsokat a .env fájlban.")
 
     conn.close()
     print(f"\n  ✅ update_results.py kész.\n")
