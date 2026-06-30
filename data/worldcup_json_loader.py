@@ -57,6 +57,13 @@ HOST_INFO: dict[int, tuple[str, str]] = {
 }
 
 
+# Csapatnév mapping: JSON név → DB név (ha eltér)
+TEAM_NAME_MAP: dict[str, str] = {
+    "USA":                      "United States",
+    "Bosnia & Herzegovina":     "Bosnia and Herzegovina",
+    "DR Congo":                "DR Congo",
+}
+
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _fetch_json(url: str) -> Optional[dict]:
@@ -94,6 +101,8 @@ def _make_unique_code(conn: sqlite3.Connection, name: str) -> str:
 
 def _get_or_create_team(conn: sqlite3.Connection, name: str) -> int:
     name = name.strip()
+    # Név mapping alkalmazása (ha eltér a JSON név a DB névtől)
+    name = TEAM_NAME_MAP.get(name, name)
     row = conn.execute("SELECT id FROM team WHERE name=?", (name,)).fetchone()
     if row:
         return row["id"]
