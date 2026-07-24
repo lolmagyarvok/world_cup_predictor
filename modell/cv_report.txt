@@ -6,85 +6,85 @@ CV: TimeSeriesSplit (5 fold)
 
 Metrika            Átlag      Std
 -----------------------------------
-Accuracy           0.579    0.024
-Log Loss           1.325    0.410
-Brier Score        0.200    0.018
+Accuracy           0.891    0.060
+Log Loss           0.394    0.186
+Brier Score        0.050    0.019
 
 ===================================
 
 Fold 1 (train=171, test=169)
-  Accuracy=0.568  LogLoss=2.102  Brier=0.183
+  Accuracy=0.787  LogLoss=0.509  Brier=0.082
               precision    recall  f1-score   support
 
-        Away       0.44      0.57      0.50        42
-        Draw       0.58      0.13      0.22        52
-        Home       0.63      0.87      0.73        75
+        Away       0.73      0.95      0.82        42
+        Draw       0.79      0.42      0.55        52
+        Home       0.83      0.95      0.88        75
 
-    accuracy                           0.57       169
-   macro avg       0.55      0.52      0.48       169
-weighted avg       0.57      0.57      0.52       169
+    accuracy                           0.79       169
+   macro avg       0.78      0.77      0.75       169
+weighted avg       0.79      0.79      0.77       169
 
 
 Fold 2 (train=340, test=169)
-  Accuracy=0.609  LogLoss=1.336  Brier=0.202
+  Accuracy=0.882  LogLoss=0.697  Brier=0.055
               precision    recall  f1-score   support
 
-        Away       0.67      0.61      0.63        66
-        Draw       0.30      0.29      0.30        31
-        Home       0.68      0.75      0.72        72
+        Away       0.93      0.86      0.90        65
+        Draw       0.70      0.94      0.80        32
+        Home       0.95      0.88      0.91        72
 
-    accuracy                           0.61       169
-   macro avg       0.55      0.55      0.55       169
-weighted avg       0.61      0.61      0.61       169
+    accuracy                           0.88       169
+   macro avg       0.86      0.89      0.87       169
+weighted avg       0.90      0.88      0.89       169
 
 
 Fold 3 (train=509, test=169)
-  Accuracy=0.568  LogLoss=0.923  Brier=0.176
+  Accuracy=0.888  LogLoss=0.279  Brier=0.049
               precision    recall  f1-score   support
 
-        Away       0.62      0.62      0.62        64
-        Draw       0.50      0.05      0.09        42
-        Home       0.54      0.86      0.66        63
+        Away       0.85      0.94      0.89        64
+        Draw       0.88      0.81      0.84        43
+        Home       0.95      0.89      0.92        62
 
-    accuracy                           0.57       169
-   macro avg       0.55      0.51      0.46       169
-weighted avg       0.56      0.57      0.50       169
+    accuracy                           0.89       169
+   macro avg       0.89      0.88      0.88       169
+weighted avg       0.89      0.89      0.89       169
 
 
 Fold 4 (train=678, test=169)
-  Accuracy=0.604  LogLoss=1.116  Brier=0.219
+  Accuracy=0.941  LogLoss=0.174  Brier=0.033
               precision    recall  f1-score   support
 
-        Away       0.47      0.94      0.63        51
-        Draw       0.00      0.00      0.00        27
-        Home       0.83      0.59      0.69        91
+        Away       0.92      0.96      0.94        51
+        Draw       0.81      0.96      0.88        27
+        Home       1.00      0.92      0.96        91
 
-    accuracy                           0.60       169
-   macro avg       0.43      0.51      0.44       169
-weighted avg       0.59      0.60      0.56       169
+    accuracy                           0.94       169
+   macro avg       0.91      0.95      0.93       169
+weighted avg       0.95      0.94      0.94       169
 
 
 Fold 5 (train=847, test=169)
-  Accuracy=0.544  LogLoss=1.150  Brier=0.220
+  Accuracy=0.959  LogLoss=0.312  Brier=0.028
               precision    recall  f1-score   support
 
-        Away       0.51      0.62      0.56        52
-        Draw       0.00      0.00      0.00        39
-        Home       0.57      0.77      0.66        78
+        Away       0.91      0.96      0.93        52
+        Draw       1.00      0.97      0.99        39
+        Home       0.97      0.95      0.96        78
 
-    accuracy                           0.54       169
-   macro avg       0.36      0.46      0.40       169
-weighted avg       0.42      0.54      0.47       169
+    accuracy                           0.96       169
+   macro avg       0.96      0.96      0.96       169
+weighted avg       0.96      0.96      0.96       169
 
 
 Feature fontosság (top 10):
-  elo_diff                  0.1085
-  elo_home_rel              0.1056
-  home_win_rate             0.0677
-  squad_value_diff          0.0640
-  away_win_rate             0.0629
-  stage_weight              0.0619
-  momentum_diff             0.0606
-  is_host_home              0.0521
-  form_goals_diff           0.0520
-  is_knockout               0.0501
+  win_rate_diff             0.2662
+  momentum_diff             0.1741
+  home_win_rate             0.1241
+  away_win_rate             0.0867
+  form_goals_diff           0.0465
+  away_momentum             0.0436
+  is_knockout               0.0413
+  elo_diff                  0.0365
+  home_momentum             0.0309
+  elo_home_rel              0.0292

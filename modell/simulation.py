@@ -30,7 +30,7 @@ from pipeline import (
     _build_elo_timeline,
     _build_form_cache,
 )
-from train import load_model, predict_proba
+from train import load_model, predict_proba, predict_proba_with_draw_boost
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -102,7 +102,10 @@ class ProbCache:
                 self._conn, h_id, a_id, "Group stage",
                 self._elo_tl, self._form_cache
             )
-            raw_probs = predict_proba(self._model, self._feature_names, X)[0]
+            # Draw boost: a döntetlen esélyét 1.4×-re növeljük (class imbalance korrekció)
+            raw_probs = predict_proba_with_draw_boost(
+                self._model, self._feature_names, X, draw_boost=1.4
+            )[0]
             
             # 2. Megnézzük a modell belső sorrendjét
             classes = list(self._model.classes_)
@@ -273,14 +276,17 @@ def best_third_place(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def resolve_r32_bracket(
-    r32_template: list[dict],       # DB sorok: home="1A", away="2B" stb.
+    r32_template: list[dict],       # DB sorok: home="1A" (slot) vagy "Paraguay" (valós név)
     group_results: dict[str, list[Standing]],   # "A" → [1., 2., 3., 4.]
     best_thirds: list[tuple[str, Standing]],    # [(group, standing), ...]
+    all_teams: list[Team],                      # összes 2026-os csapat
 ) -> list[tuple[Team, Team]]:
     """
     Feloldja a placeholder neveket valódi csapatokra.
     Pl. "1A" → csoport A 1. helyezettje
         "3A/B/C/D/F" → a legjobb harmadikak közül aki az A/B/C/D/F csoportból van
+    Ha a DB-ben VALÓS csapatnevek vannak (nem slot-ok), azokat all_teams-ból
+    oldja fel. Lásd: README.md (ismeret hiba: simulation R32 slot bug).
     """
     # Lookup: "1A" → Team
     slot_to_team: dict[str, Team] = {}
@@ -289,6 +295,9 @@ def resolve_r32_bracket(
         slot_to_team[f"1{group_letter}"] = standings[0].team
         slot_to_team[f"2{group_letter}"] = standings[1].team
         slot_to_team[f"3{group_letter}"] = standings[2].team
+
+    # Fallback: valós név → Team (ha a DB-ben nem slot-ok, hanem csapatnevek vannak)
+    name_to_team: dict[str, Team] = {t.name: t for t in all_teams}
 
     # Harmadik helyezett slot-ok feloldása
     # A DB-ben pl. "3A/B/C/D/F" azt jelenti: az A,B,C,D,F csoportok
@@ -310,8 +319,8 @@ def resolve_r32_bracket(
             if remaining_thirds:
                 best_idx = max(
                     range(len(remaining_thirds)),
-                    key=lambda i: remaining_thirds[i][1].pts * 1000 
-                                + remaining_thirds[i][1].gd * 10 
+                    key=lambda i: remaining_thirds[i][1].pts * 1000
+                                + remaining_thirds[i][1].gd * 10
                                 + remaining_thirds[i][1].gf
                 )
                 return remaining_thirds.pop(best_idx)[1].team
@@ -322,23 +331,37 @@ def resolve_r32_bracket(
         remaining_thirds.pop(best[0])
         return best[2].team
 
+    def _is_slot_name(name: str) -> bool:
+        """Ellenőrzi, hogy a név slot-formátumú-e (pl. '1A', '3A/B/C') vagy valós csapatnév."""
+        if not name:
+            return False
+        # Slot formátum: szám(ok) + betű(k), esetleg /-sel elválasztva
+        # Pl. "1A", "2B", "3A/B/C/D/F"
+        first_char = name[0]
+        if first_char in ("1", "2", "3") and len(name) >= 2:
+            rest = name[1:]
+            # Lehet "A", "A/B/C" stb. — csak betűket és / jelet tartalmazhat
+            return all(c.isalpha() or c == "/" for c in rest)
+        return False
+
+    def _resolve_name(name: str) -> Optional[Team]:
+        """Egy név feloldása: először slot-névként, aztán valós csapatnévként."""
+        if _is_slot_name(name):
+            if name.startswith("3"):
+                return resolve_third_slot(name)
+            return slot_to_team.get(name)
+        # Valós csapatnév a DB-ből
+        return name_to_team.get(name)
+
     pairs: list[tuple[Team, Team]] = []
     for m in sorted(r32_template, key=lambda x: x["match_date"]):
-        home_slot = m["home_name"]
-        away_slot = m["away_name"]
-
-        if home_slot.startswith("3"):
-            home_team = resolve_third_slot(home_slot)
-        else:
-            home_team = slot_to_team.get(home_slot)
-
-        if away_slot.startswith("3"):
-            away_team = resolve_third_slot(away_slot)
-        else:
-            away_team = slot_to_team.get(away_slot)
+        home_team = _resolve_name(m["home_name"])
+        away_team = _resolve_name(m["away_name"])
 
         if home_team and away_team:
             pairs.append((home_team, away_team))
+        else:
+            print(f"  {Y}⚠️  R32 párosítás feloldása sikertelen: '{m['home_name']}' vs '{m['away_name']}'{RESET}")
 
     return pairs
 
@@ -381,26 +404,7 @@ RESET = "\033[0m"
 
 
 def _flag(name: str) -> str:
-    flags = {
-        "France":"🇫🇷","Argentina":"🇦🇷","Brazil":"🇧🇷","Germany":"🇩🇪",
-        "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Spain":"🇪🇸","Netherlands":"🇳🇱","Portugal":"🇵🇹",
-        "Belgium":"🇧🇪","Croatia":"🇭🇷","Japan":"🇯🇵","Morocco":"🇲🇦",
-        "USA":"🇺🇸","Mexico":"🇲🇽","Canada":"🇨🇦","Uruguay":"🇺🇾",
-        "Colombia":"🇨🇴","Ecuador":"🇪🇨","Senegal":"🇸🇳","South Korea":"🇰🇷",
-        "Australia":"🇦🇺","Switzerland":"🇨🇭","Denmark":"🇩🇰","Poland":"🇵🇱",
-        "Serbia":"🇷🇸","Iran":"🇮🇷","Saudi Arabia":"🇸🇦","Ghana":"🇬🇭",
-        "Cameroon":"🇨🇲","Tunisia":"🇹🇳","Qatar":"🇶🇦","Turkey":"🇹🇷",
-        "Sweden":"🇸🇪","Norway":"🇳🇴","Austria":"🇦🇹","Czech Republic":"🇨🇿",
-        "Slovakia":"🇸🇰","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Wales":"🏴󠁧󠁢󠁷󠁬󠁳󠁿","Algeria":"🇩🇿",
-        "Nigeria":"🇳🇬","Egypt":"🇪🇬","South Africa":"🇿🇦","Paraguay":"🇵🇾",
-        "Bolivia":"🇧🇴","Peru":"🇵🇪","Chile":"🇨🇱","Costa Rica":"🇨🇷",
-        "Panama":"🇵🇦","Honduras":"🇭🇳","Haiti":"🇭🇹","Jamaica":"🇯🇲",
-        "Cuba":"🇨🇺","Curaçao":"🇨🇼","New Zealand":"🇳🇿","Uzbekistan":"🇺🇿",
-        "Jordan":"🇯🇴","Iraq":"🇮🇶","Bosnia & Herzegovina":"🇧🇦",
-        "Bosnia and Herzegovina":"🇧🇦","Cape Verde":"🇨🇻","DR Congo":"🇨🇩",
-        "Ivory Coast":"🇨🇮","Portugal":"🇵🇹",
-    }
-    return flags.get(name, "🏳")
+    return ""
 
 
 def print_group_standings(
@@ -485,15 +489,15 @@ def print_knockout_round(
 
 def print_header() -> None:
     print()
-    print("  ╔══════════════════════════════════════════════════════════════╗")
-    print("  ║         🏆  FIFA WORLD CUP 2026 – SZIMULÁCIÓ  🏆            ║")
-    print("  ║             USA / Canada / Mexico                             ║")
-    print("  ╚══════════════════════════════════════════════════════════════╝")
+    print("  +-------------------------------------------------------------+")
+    print("  |              FIFA WORLD CUP 2026 – SZIMULACIO               |")
+    print("  |             USA / Canada / Mexico                           |")
+    print("  +-------------------------------------------------------------+")
 
 
 def print_champion(winner: Team) -> None:
     flag  = _flag(winner.name)
-    line  = f"  🏆  GYŐZTES:  {flag}  {winner.name}  {flag}  🏆"
+    line  = f"  GYOZTES:  {winner.name}"
     pad   = "═" * (len(line) - 10)  # emoji kompenzáció
     print(f"\n  {W}{'═'*58}{RESET}")
     print(f"  {W}{line}{RESET}")
@@ -620,7 +624,7 @@ def run(seed: int = 42) -> None:
         print(f"    {DIM}✗ {st.team.name} (Group {gl})  Pts:{st.pts}{RESET}")
 
     # ── 3. ROUND OF 32 ────────────────────────────────────────────────
-    r32_pairs = resolve_r32_bracket(r32_template, group_standings, best_thirds)
+    r32_pairs = resolve_r32_bracket(r32_template, group_standings, best_thirds, all_teams)
 
     r32_winners, r32_results = simulate_knockout_round(
         r32_pairs, "Round of 32", cache, elo_cache, rng

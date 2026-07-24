@@ -29,7 +29,7 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from data.db import get_connection
 from modell.pipeline import build_prediction_row, _build_elo_timeline, _build_form_cache
-from modell.train import load_model, predict_proba
+from modell.train import load_model, predict_proba, predict_proba_with_draw_boost
 
 # ── Konfiguráció ──────────────────────────────────────────────────────────────
 
@@ -115,7 +115,8 @@ def _predict_match(conn, model, feature_names, elo_tl, form_cache,
                    home_id: int, away_id: int, stage: str) -> np.ndarray:
     try:
         X = build_prediction_row(conn, home_id, away_id, stage, elo_tl, form_cache)
-        raw = predict_proba(model, feature_names, X)[0]
+        # Draw boost: a döntetlen esélyét 1.4×-re növeljük (class imbalance korrekció)
+        raw = predict_proba_with_draw_boost(model, feature_names, X, draw_boost=1.4)[0]
 
         classes   = list(model.classes_)
         idx_away  = classes.index(0)

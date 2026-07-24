@@ -72,6 +72,26 @@ def train(conn, verbose: bool = True) -> dict:
     X_arr = X.values.astype(np.float32)
     y_arr = y.values
 
+    # ── Súlyozás a döntetlen osztályra (class imbalance kezelés) ────────
+    # A draw a legritkább ~22%. Súlyozzuk inverz arányban.
+    n_total = len(y_arr)
+    n_draw = int(sum(y_arr == 1))
+    n_home = int(sum(y_arr == 2))
+    n_away = int(sum(y_arr == 0))
+    n_classes = 3
+
+    draw_weight = n_total / (n_classes * n_draw) if n_draw > 0 else 1.0
+    home_weight = n_total / (n_classes * n_home) if n_home > 0 else 1.0
+    away_weight = n_total / (n_classes * n_away) if n_away > 0 else 1.0
+
+    sample_weight_arr = np.ones(n_total, dtype=np.float32)
+    sample_weight_arr[y_arr == 1] = draw_weight
+    sample_weight_arr[y_arr == 2] = home_weight
+    sample_weight_arr[y_arr == 0] = away_weight
+
+    if verbose:
+        print(f"  Sample weight → away={away_weight:.2f}, draw={draw_weight:.2f}, home={home_weight:.2f}")
+
     # ── TimeSeriesSplit CV (nem random!) ──────────────────────────────
     # 868 meccs időrendben → 5 fold, mindig a múlton tanít, jövőn tesztel
     tscv = TimeSeriesSplit(n_splits=5)
@@ -87,11 +107,12 @@ def train(conn, verbose: bool = True) -> dict:
     for fold, (train_idx, test_idx) in enumerate(tscv.split(X_arr), 1):
         X_tr, X_te = X_arr[train_idx], X_arr[test_idx]
         y_tr, y_te = y_arr[train_idx], y_arr[test_idx]
+        sw_tr      = sample_weight_arr[train_idx]
 
         base = xgb.XGBClassifier(**XGB_PARAMS, verbosity=0)
         # Kalibrálás: isotonic jobb mint sigmoid kis adaton
         model = CalibratedClassifierCV(base, method="isotonic", cv=3)
-        model.fit(X_tr, y_tr)
+        model.fit(X_tr, y_tr, sample_weight=sw_tr)
 
         probs = model.predict_proba(X_te)
         preds = np.argmax(probs, axis=1)
@@ -128,7 +149,7 @@ def train(conn, verbose: bool = True) -> dict:
 
     base_final = xgb.XGBClassifier(**XGB_PARAMS, verbosity=0)
     final_model = CalibratedClassifierCV(base_final, method="isotonic", cv=5)
-    final_model.fit(X_arr, y_arr)
+    final_model.fit(X_arr, y_arr, sample_weight=sample_weight_arr)
 
     # Feature importance (a belső XGB modellből)
     try:
@@ -207,6 +228,23 @@ def predict_proba(model, feature_names: list[str], X: pd.DataFrame) -> np.ndarra
     """
     X_ordered = X[feature_names].values.astype(np.float32)
     return model.predict_proba(X_ordered)
+
+
+def predict_proba_with_draw_boost(
+    model, feature_names: list[str], X: pd.DataFrame,
+    draw_boost: float = 1.4
+) -> np.ndarray:
+    """
+    Mint predict_proba(), de a döntetlen valószínűségét megnöveli.
+
+    draw_boost: szorzó (1.4 = 40%-kal növeli a draw esélyét)
+    A másik két osztályt arányosan csökkenti, hogy összeg=1 maradjon.
+    """
+    probs = predict_proba(model, feature_names, X)
+    adjusted = probs.copy()
+    adjusted[:, 1] *= draw_boost
+    row_sums = adjusted.sum(axis=1, keepdims=True)
+    return adjusted / row_sums
 
 
 if __name__ == "__main__":

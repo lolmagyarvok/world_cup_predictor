@@ -185,8 +185,8 @@ def main():
 
     # Dates that were missed
     missed_dates = []
-    d = date(2026, 6, 21)
-    end = date(2026, 6, 29)
+    d = date(2026, 7, 14)
+    end = date(2026, 7, 20)
     while d <= end:
         missed_dates.append(str(d))
         d += timedelta(days=1)

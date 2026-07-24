@@ -2,7 +2,7 @@
 parsers/api_football_loader.py
 
 API-Football.com adatok betöltése:
-  - 2026 VB keretek (/players/squads)
+  - 2022 VB keretek (/players/squads)
   - Sérülések (/injuries)
 
 Free tier: 100 request/nap. Ez a script cache-el (JSON fájlokba),

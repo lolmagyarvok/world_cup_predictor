@@ -48,24 +48,26 @@ HEADERS = {
 # api-football → DB csapatnév megfeleltetés
 # Bővítsd ki, ha a csapatnevekben eltérést tapasztalsz!
 API_NAME_MAP = {
-    "United States": "USA",
-    "South Korea":   "South Korea",
-    "IR Iran":       "Iran",
-    "Korea Republic": "South Korea",
+    "United States":             "United States",
+    "South Korea":               "South Korea",
+    "IR Iran":                   "Iran",
+    "Korea Republic":            "South Korea",
 }
 
-# football-data.org → DB csapatnév megfeleltetés
+# football-data.org → API-Football közös formátum (majd API_NAME_MAP megy tovább DB-be)
 FD_NAME_MAP = {
     "USA":                     "United States",
-    "Korea Republic":          "South Korea",
-    "Côte d'Ivoire":           "Ivory Coast",
-    "IR Iran":                 "Iran",
+    "Korea Republic":          "Korea Republic",
+    "Côte d'Ivoire":           "Côte d'Ivoire",
+    "IR Iran":                 "IR Iran",
     "Iran":                    "Iran",
-    "Bosnia-Herzegovina":      "Bosnia and Herzegovina",
-    "Curaçao":                 "Curacao",
+    "Bosnia-Herzegovina":      "Bosnia-Herzegovina",
+    "Curaçao":                 "Curaçao",
     "New Caledonia":           "New Caledonia",
     "DR Congo":                "DR Congo",
+    "Congo DR":                "DR Congo",
     "South Korea":             "South Korea",
+    "Cape Verde Islands":      "Cape Verde",
 }
 
 # ── ELO frissítés ─────────────────────────────────────────────────────────────

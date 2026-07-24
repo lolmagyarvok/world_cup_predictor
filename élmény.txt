@@ -8,3 +8,7 @@ Amikor a modell meglátta, hogy Új-Zéland FIFA rangja 0, Franciaországé meg 
 
 fcc-server
 fcc-claude
+
+
+ctrl + i editelni
+ctrl + l csak magyarázni  
